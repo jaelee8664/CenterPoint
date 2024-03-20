@@ -1,5 +1,5 @@
 import os.path as osp
-
+import pdb
 import torch
 
 from ...utils import master_only
@@ -37,16 +37,28 @@ class TensorboardLoggerHook(LoggerHook):
     @master_only
     def log(self, trainer):
         for var in trainer.log_buffer.output:
-            if var in ["time", "data_time"]:
+            # keys: odict_keys(['data_time', 'transfer_time', 'forward_time', 'loss_parse_time', 'loss', 'hm_loss', 'loc_loss', 'loc_loss_elem', 'num_positive', 'time'])
+            
+            if var in ["time", "data_time", 'transfer_time', 'forward_time', 'loss_parse_time', 'loc_loss_elem', 'num_positive']:
                 continue
             tag = "{}/{}".format(var, trainer.mode)
             record = trainer.log_buffer.output[var]
-            if isinstance(record, str):
-                self.writer.add_text(tag, record, trainer.iter)
-            else:
-                self.writer.add_scalar(
-                    tag, trainer.log_buffer.output[var], trainer.iter
-                )
+            class_names = trainer.model.module.bbox_head.class_names
+            try:
+                if isinstance(record, str):
+                    self.writer.add_text(tag, record, trainer.iter)
+                elif isinstance(record, list):
+                    for idx, task_class_names in enumerate(class_names):
+                        tag_cls = tag + "/" + str(task_class_names)
+                        self.writer.add_scalar(
+                            tag_cls, trainer.log_buffer.output[var][idx], trainer.iter
+                        )
+                else:
+                    self.writer.add_scalar(
+                        tag, trainer.log_buffer.output[var], trainer.iter
+                    )
+            except:
+                pdb.set_trace()
 
     @master_only
     def after_run(self, trainer):

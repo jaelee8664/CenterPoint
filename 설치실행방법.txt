@@ -1,0 +1,26 @@
+// https://github.com/tianweiy/CenterPoint 설치 방법
+
+// 파이토치 사양에 맞게 설치
+
+// requirements.txt 설치
+pip install -r requirements.txt
+
+// spconv는 패키지 클론하지말고 pip으로 설치
+pip install spconv-cu114
+
+// nusene 다운로드(at /mnt/hdd0/nuscenes)
+wget https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval_meta.tgz
+wget https://motional-nuscenes.s3.amazonaws.com/public/v1.0/v1.0-trainval01_blobs.tgz && wget https://motional-nuscenes.s3.amazonaws.com/public/v1.0/v1.0-trainval02_blobs.tgz && wget https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval03_blobs.tgz && wget https://motional-nuscenes.s3.amazonaws.com/public/v1.0/v1.0-trainval04_blobs.tgz && wget https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval05_blobs.tgz && wget https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval06_blobs.tgz && wget https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval07_blobs.tgz && wget https://motional-nuscenes.s3.amazonaws.com/public/v1.0/v1.0-trainval08_blobs.tgz && wget https://motional-nuscenes.s3.amazonaws.com/public/v1.0/v1.0-trainval09_blobs.tgz && wget https://motional-nuscenes.s3.amazonaws.com/public/v1.0/v1.0-trainval10_blobs.tgz
+
+// 압축풀기
+완료 tar -xvzf v1.0-trainval_meta.tgz
+완료 pigz -dc v1.0-trainval01_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval02_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval03_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval04_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval05_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval06_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval07_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval08_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval09_blobs.tgz | pv | tar xf - && pigz -dc v1.0-trainval10_blobs.tgz | pv | tar xf -
+
+// Create pkl data
+python tools/create_data.py nuscenes_data_prep --root_path=NUSCENES_TRAINVAL_DATASET_ROOT --version="v1.0-trainval" --nsweeps=10
+
+// 훈련 실행
+python -m torch.distributed.launch --nproc_per_node=2 ./tools/train.py configs/nusc/voxelnet/nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.py && python -m torch.distributed.launch --nproc_per_node=2 ./tools/train.py configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py
+
+// 트래킹 검증(val set)(deprecated)
+python tools/nusc_tracking/pub_test.py --work_dir modelzoo/tracking/ --checkpoint modelzoo/voxelnet/infos_val_10sweeps_withvelo_filter_True.json

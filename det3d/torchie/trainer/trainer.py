@@ -18,6 +18,7 @@ from .hooks import (
     LrUpdaterHook,
     OptimizerHook,
     lr_updater,
+    TensorboardLoggerHook,
 )
 from .log_buffer import LogBuffer
 from .priority import get_priority
@@ -590,5 +591,6 @@ class Trainer(object):
         self.register_hook(self.build_hook(optimizer_config, OptimizerHook))
         self.register_hook(self.build_hook(checkpoint_config, CheckpointHook))
         self.register_hook(IterTimerHook())
+        self.register_hook(TensorboardLoggerHook())
         if log_config is not None:
             self.register_logger_hooks(log_config)

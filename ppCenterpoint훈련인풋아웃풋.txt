@@ -1,0 +1,33 @@
+"모델구조"
+1. reader
+2. backbone
+3. neck
+4. bbox_head
+
+
+"reader 인풋"
+1. data["features"] => example["voxels"]
+2. data["num_voxels"] => example["num_voxels"]
+3. data["coors"] => example["coordinates"]
+
+"reader 아웃풋"
+1. input_features
+
+"backbone 인풋"
+1. input_features
+2. data["coors"] => example["coordinates"]
+3. data["batch_size"] => len(example["num_voxels"])
+4. data["input_shape"] => example["shape"][0]
+
+"backbone 아웃풋"
+1. x
+
+"neck 인풋 아웃풋"
+1. x
+
+"bbox_head 인풋"
+1. x
+
+"bbox_head 아웃풋"
+1. preds
+

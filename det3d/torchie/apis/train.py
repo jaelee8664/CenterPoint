@@ -265,7 +265,7 @@ def train_detector(model, dataset, cfg, distributed=False, validate=False, logge
     total_steps = cfg.total_epochs * len(data_loaders[0])
     # print(f"total_steps: {total_steps}")
     if distributed:
-        model = apex.parallel.convert_syncbn_model(model)
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     if cfg.lr_config.type == "one_cycle":
         # build trainer
         optimizer = build_one_cycle_optimizer(model, cfg.optimizer)
