@@ -5,7 +5,7 @@ import pickle
 import fire, os
 
 from det3d.datasets.nuscenes import nusc_common as nu_ds
-from det3d.datasets.utils.create_gt_database import create_groundtruth_database
+from det3d.datasets.utils.create_gt_database import create_groundtruth_database, create_etri_groundtruth_databse
 from det3d.datasets.waymo import waymo_common as waymo_ds
 
 def nuscenes_data_prep(root_path, version, nsweeps=10, filter_zero=True, virtual=False):
@@ -29,7 +29,11 @@ def waymo_data_prep(root_path, split, nsweeps=1):
             used_classes=['VEHICLE', 'CYCLIST', 'PEDESTRIAN'],
             nsweeps=nsweeps
         )
-    
+
+def etriInfra_data_prep(root_path):
+    create_etri_groundtruth_databse(
+        root_path
+    )
 
 if __name__ == "__main__":
     fire.Fire()

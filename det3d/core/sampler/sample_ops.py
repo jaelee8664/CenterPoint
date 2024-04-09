@@ -8,7 +8,7 @@ import numpy as np
 from det3d.core.bbox import box_np_ops
 from det3d.core.sampler import preprocess as prep
 from det3d.utils.check import shape_mergeable
-
+import pdb
 
 class DataBaseSamplerV2:
     def __init__(
@@ -107,6 +107,7 @@ class DataBaseSamplerV2:
     ):
         sampled_num_dict = {}
         sample_num_per_class = []
+
         for class_name, max_sample_num in zip(
             self._sample_classes, self._sample_max_nums
         ):
@@ -210,6 +211,7 @@ class DataBaseSamplerV2:
                         s_points = s_points[np.logical_not(mask)]
                     s_points_list_new.append(s_points)
                 s_points_list = s_points_list_new
+            # print("s_point_list", s_points_list)
             ret = {
                 "gt_names": np.array([s["name"] for s in sampled]),
                 "difficulty": np.array([s["difficulty"] for s in sampled]),

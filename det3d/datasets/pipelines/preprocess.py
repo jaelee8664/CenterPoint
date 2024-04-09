@@ -56,6 +56,8 @@ class Preprocess(object):
                 points = res["lidar"]["points"]
         elif res["type"] in ["NuScenesDataset"]:
             points = res["lidar"]["combined"]
+        elif res["type"] in ["etrInfraDataset"]:
+            points = res["lidar"]["points"]
         else:
             raise NotImplementedError
 
@@ -78,7 +80,7 @@ class Preprocess(object):
                 point_counts = box_np_ops.points_count_rbbox(
                     points, gt_dict["gt_boxes"]
                 )
-                mask = point_counts >= min_points_in_gt
+                mask = point_counts >= self.min_points_in_gt
                 _dict_select(gt_dict, mask)
 
             gt_boxes_mask = np.array(
@@ -86,8 +88,12 @@ class Preprocess(object):
             )
 
             if self.db_sampler:
+                if res["type"] == "etrInfraDataset":
+                    root_path = ""
+                else:
+                    root_path = res["metadata"]["image_prefix"]
                 sampled_dict = self.db_sampler.sample_all(
-                    res["metadata"]["image_prefix"],
+                    root_path,
                     gt_dict["gt_boxes"],
                     gt_dict["gt_names"],
                     res["metadata"]["num_point_features"],
@@ -364,8 +370,10 @@ class AssignLabel(object):
                     anno_box = np.zeros((max_objs, 10), dtype=np.float32)
                 elif res['type'] == 'WaymoDataset':
                     anno_box = np.zeros((max_objs, 10), dtype=np.float32) 
+                elif res['type'] == 'etrInfraDataset':
+                    anno_box = np.zeros((max_objs, 10), dtype=np.float32)
                 else:
-                    raise NotImplementedError("Only Support nuScene for Now!")
+                    raise NotImplementedError("We support Nuscene, Waymo, etryInfra datasets only!")
 
                 ind = np.zeros((max_objs), dtype=np.int64)
                 mask = np.zeros((max_objs), dtype=np.uint8)
@@ -407,7 +415,7 @@ class AssignLabel(object):
                         ind[new_idx] = y * feature_map_size[0] + x
                         mask[new_idx] = 1
 
-                        if res['type'] == 'NuScenesDataset': 
+                        if res['type'] == 'NuScenesDataset' or res['type'] == 'etrInfraDataset': 
                             vx, vy = gt_dict['gt_boxes'][idx][k][6:8]
                             rot = gt_dict['gt_boxes'][idx][k][8]
                             anno_box[new_idx] = np.concatenate(
@@ -435,6 +443,8 @@ class AssignLabel(object):
             if res["type"] == "NuScenesDataset":
                 gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
             elif res['type'] == "WaymoDataset":
+                gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
+            elif res['type'] == "etrInfraDataset":
                 gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
             else:
                 raise NotImplementedError()

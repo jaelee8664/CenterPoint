@@ -49,7 +49,7 @@ class NuScenesDataset(PointCloudDataset):
         )
 
         self.nsweeps = nsweeps
-        assert self.nsweeps > 0, "At least input one sweep please!"
+        # assert self.nsweeps > 0, "At least input one sweep please!"
         print(self.nsweeps)
 
         self._info_path = info_path

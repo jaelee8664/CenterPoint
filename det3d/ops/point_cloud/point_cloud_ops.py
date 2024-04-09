@@ -32,6 +32,9 @@ def _points_to_voxel_reverse_kernel(
     failed = False
     for i in range(N):
         failed = False
+        # if there is any nan value in points, continue
+        if np.any(np.isnan(points[i,:])):
+            continue
         for j in range(ndim):
             c = np.floor((points[i, j] - coors_range[j]) / voxel_size[j])
             if c < 0 or c >= grid_size[j]:

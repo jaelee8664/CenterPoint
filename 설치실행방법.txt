@@ -21,10 +21,14 @@ wget https://motional-nuscenes.s3.amazonaws.com/public/v1.0/v1.0-trainval01_blob
 
 // Create pkl data
 python tools/create_data.py nuscenes_data_prep --root_path=NUSCENES_TRAINVAL_DATASET_ROOT --version="v1.0-trainval" --nsweeps=10
+// etri 데이터
+python tools/create_data.py etriInfra_data_prep --root_path=data/etri3Dobj_infra_edge
 
 // 훈련 실행
 python -m torch.distributed.launch --nproc_per_node=2 ./tools/train.py configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py
 python -m torch.distributed.launch --nproc_per_node=2 ./tools/train.py configs/nusc/voxelnet/nusc_centerpoint_voxelnet_0075voxel_fix_bn_z.py
+// etri 데이터 훈련
+python -m torch.distributed.launch --nproc_per_node=2 ./tools/train.py configs/etriInfra/pp/etriInfra_centerpoint_pp_02voxel_two_pfn_10sweep.py
 
 // eval
 python ./tools/dist_test.py configs/nusc/pp/nusc_centerpoint_pp_02voxel_two_pfn_10sweep.py --work_dir work_dirs/ --checkpoint modelzoo/pointpillar/latest.pth --speed_test

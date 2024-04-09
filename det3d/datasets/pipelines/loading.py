@@ -176,6 +176,9 @@ class LoadPointCloudFromFile(object):
                 res["lidar"]["points"] = points
                 res["lidar"]["times"] = times
                 res["lidar"]["combined"] = np.hstack([points, times])
+        elif self.type == "etrInfraDataset":
+            res["lidar"]["points"] = info["points"]
+            res["type"] = "etrInfraDataset"
         else:
             raise NotImplementedError
 
@@ -203,6 +206,8 @@ class LoadPointCloudAnnotations(object):
                 "boxes": info["gt_boxes"].astype(np.float32),
                 "names": info["gt_names"],
             }
+        elif res["type"] == 'etrInfraDataset':
+            res["lidar"]["annotations"] = info["annotations"]
         else:
             pass 
 
