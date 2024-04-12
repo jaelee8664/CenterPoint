@@ -65,17 +65,7 @@ model = dict(
         common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
 )
-#     bbox_head=dict(
-#         # type='RPNHead',
-#         type="CenterHead",
-#         in_channels=sum([128, 128, 128]),
-#         tasks=tasks,
-#         dataset='nuscenes',
-#         weight=0.25,
-#         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2, 1.0, 1.0],
-#         common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2), 'vel': (2, 2)}, # (output_channel, num_conv)
-#     ),
-# )
+
 assigner = dict(
     target_assigner=target_assigner,
     out_size_factor=get_downsample_factor(model),
@@ -168,6 +158,13 @@ train_preprocessor = dict(
 val_preprocessor = dict(
     mode="val",
     shuffle_points=False,
+    class_names=class_names,
+)
+
+test_preprocessor = dict(
+    mode="test",
+    shuffle_points=False,
+    class_names=class_names,
 )
 
 voxel_generator = dict(

@@ -35,14 +35,14 @@ class Preprocess(object):
             self.global_rotation_noise = cfg.global_rot_noise
             self.global_scaling_noise = cfg.global_scale_noise
             self.global_translate_std = cfg.get('global_translate_std', 0)
-            self.class_names = cfg.class_names
+            # self.class_names = cfg.class_names
             if cfg.db_sampler != None:
                 self.db_sampler = build_dbsampler(cfg.db_sampler)
             else:
                 self.db_sampler = None 
                 
             self.npoints = cfg.get("npoints", -1)
-
+        self.class_names = cfg.class_names
         self.no_augmentation = cfg.get('no_augmentation', False)
 
     def __call__(self, res, info):
@@ -160,7 +160,24 @@ class Preprocess(object):
 
         if self.mode == "train":
             res["lidar"]["annotations"] = gt_dict
+        elif (self.mode == "val" and res["type"] == "etrInfraDataset"):
+            anno_dict = res["lidar"]["annotations"]
+            gt_dict = {
+                "gt_boxes": anno_dict["boxes"],
+                "gt_names": np.array(anno_dict["names"]).reshape(-1),
+            }
+            gt_boxes_mask = np.array(
+                [n in self.class_names for n in gt_dict["gt_names"]], dtype=np.bool_
+            )
+            _dict_select(gt_dict, gt_boxes_mask)
 
+            gt_classes = np.array(
+                [self.class_names.index(n) + 1 for n in gt_dict["gt_names"]],
+                dtype=np.int32,
+            )
+            gt_dict["gt_classes"] = gt_classes
+            res["lidar"]["annotations"] = gt_dict
+            
         return res, info
 
 
@@ -195,6 +212,8 @@ class Voxelization(object):
 
             res["lidar"]["annotations"] = gt_dict
             max_voxels = self.max_voxel_num[0]
+        elif res["mode"] == "val" and res["type"] == "etrInfraDataset":
+            max_voxels = self.max_voxel_num[1]
         else:
             max_voxels = self.max_voxel_num[1]
 
@@ -457,9 +476,63 @@ class AssignLabel(object):
             boxes_and_cls = boxes_and_cls[:, [0, 1, 2, 3, 4, 5, 8, 6, 7, 9]]
             gt_boxes_and_cls[:num_obj] = boxes_and_cls
 
-            example.update({'gt_boxes_and_cls': gt_boxes_and_cls})
+            if res["mode"] == "train":
+                example.update({'gt_boxes_and_cls': gt_boxes_and_cls})
 
-            example.update({'hm': hms, 'anno_box': anno_boxs, 'ind': inds, 'mask': masks, 'cat': cats})
+                example.update({'hm': hms, 'anno_box': anno_boxs, 'ind': inds, 'mask': masks, 'cat': cats})
+            elif res["mode"] == "val" and res["type"] == "etrInfraDataset":
+                example.update({'gt_boxes_and_cls': gt_boxes_and_cls})
+                example.update({'anno_box': anno_boxs})
+                
+                
+        elif res["mode"] == "val" and res["type"] == "etrInfraDataset":       
+            gt_dict = res["lidar"]["annotations"]
+
+            # reorganize the gt_dict by tasks
+            task_masks = []
+            flag = 0
+            for class_name in class_names_by_task:
+                task_masks.append(
+                    [
+                        np.where(
+                            gt_dict["gt_classes"] == class_name.index(i) + 1 + flag
+                        )
+                        for i in class_name
+                    ]
+                )
+                flag += len(class_name)
+
+            task_boxes = []
+            task_classes = []
+            task_names = []
+            flag2 = 0
+            for idx, mask in enumerate(task_masks):
+                task_box = []
+                task_class = []
+                task_name = []
+                for m in mask:
+                    task_box.append(gt_dict["gt_boxes"][m])
+                    task_class.append(gt_dict["gt_classes"][m] - flag2)
+                    task_name.append(gt_dict["gt_names"][m])
+                task_boxes.append(np.concatenate(task_box, axis=0))
+                task_classes.append(np.concatenate(task_class))
+                task_names.append(np.concatenate(task_name))
+                flag2 += len(mask)
+
+            for task_box in task_boxes:
+                # limit rad to [-pi, pi]
+                task_box[:, -1] = box_np_ops.limit_period(
+                    task_box[:, -1], offset=0.5, period=np.pi * 2
+                )
+
+            # print(gt_dict.keys())
+            gt_dict["gt_classes"] = task_classes
+            gt_dict["gt_names"] = task_names
+            gt_dict["gt_boxes"] = task_boxes
+
+            res["lidar"]["annotations"] = gt_dict
+            
+            example.update({'anno_box':gt_dict["gt_boxes"], 'anno_cls': gt_dict["gt_classes"]})
         else:
             pass
 
