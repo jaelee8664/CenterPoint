@@ -11,6 +11,7 @@ from det3d import torchie
 from det3d.core import box_np_ops
 import pickle 
 import os 
+import open3d as o3d
 from ..registry import PIPELINES
 
 def _dict_select(dict_, inds):
@@ -179,6 +180,11 @@ class LoadPointCloudFromFile(object):
         elif self.type == "etrInfraDataset":
             res["lidar"]["points"] = info["points"]
             res["type"] = "etrInfraDataset"
+        elif self.type == "TestDataset":
+            pcd = o3d.io.read_point_cloud(str(res["metadata"]["data_root"] / res["metadata"]["pcd_prefix"] / info))
+            res["lidar"]["points"] = np.asarray(pcd.points, dtype=np.float32)
+            res["type"] = "TestDataset"
+            res["metadata"]["filename"] = info
         else:
             raise NotImplementedError
 

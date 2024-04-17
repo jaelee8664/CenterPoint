@@ -4,6 +4,7 @@ from .builder import build_dataset
 from .nuscenes import NuScenesDataset
 from .waymo import WaymoDataset
 from .etriInfra import etrInfraDataset
+from .etriInfra import TestDataset
 # from .custom import CustomDataset
 from .dataset_wrappers import ConcatDataset, RepeatDataset
 
@@ -25,5 +26,5 @@ __all__ = [
     "DATASETS",
     "build_dataset",
     "etrInfraDataset",
-    
+    "TestDataset",
 ]

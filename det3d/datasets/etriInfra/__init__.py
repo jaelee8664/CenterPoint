@@ -1,2 +1,3 @@
 from .etri import etrInfraDataset
-__all__ = ["etrInfraDataset"]
+from .etri import TestDataset
+__all__ = ["etrInfraDataset", "TestDataset"]

@@ -58,6 +58,8 @@ class Preprocess(object):
             points = res["lidar"]["combined"]
         elif res["type"] in ["etrInfraDataset"]:
             points = res["lidar"]["points"]
+        elif res["type"] in ["TestDataset"]:
+            points = res["lidar"]["points"]
         else:
             raise NotImplementedError
 

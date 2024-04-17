@@ -186,7 +186,8 @@ train_pipeline = [
 test_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
-    dict(type="Preprocess", cfg=val_preprocessor),
+    # dict(type="Preprocess", cfg=val_preprocessor),
+    dict(type="Preprocess", cfg=test_preprocessor),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
