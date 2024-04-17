@@ -131,7 +131,7 @@ class TestDataset(PointCloudDataset):
                 if root == str(self._root_path) + "/pcd":
                     for f in file:
                         self.pcd_file_name.append(Path(f))
-
+            self.pcd_file_name.sort()
             # self.file_dirs = []
             # for (root, dirs, file) in os.walk(str(self._root_path)):
             #     for f in file:    
