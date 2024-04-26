@@ -18,3 +18,4 @@ venv/
 .vscode/
 work_dirs/
 modelzoo/
+plot_results/

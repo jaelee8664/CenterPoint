@@ -114,7 +114,7 @@ class LoadPointCloudFromFile(object):
         self.type = dataset
         self.random_select = kwargs.get("random_select", False)
         self.npoints = kwargs.get("npoints", 16834)
-
+        self.offset = kwargs.get("offset", -0.8)
     def __call__(self, res, info):
 
         res["type"] = self.type
@@ -183,6 +183,7 @@ class LoadPointCloudFromFile(object):
         elif self.type == "TestDataset":
             pcd = o3d.io.read_point_cloud(str(res["metadata"]["data_root"] / res["metadata"]["pcd_prefix"] / info))
             res["lidar"]["points"] = np.asarray(pcd.points, dtype=np.float32)
+            res["lidar"]["points"][:, 2] += self.offset
             res["type"] = "TestDataset"
             res["metadata"]["filename"] = info
         else:
