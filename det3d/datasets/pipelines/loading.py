@@ -186,6 +186,13 @@ class LoadPointCloudFromFile(object):
             res["lidar"]["points"][:, 2] += self.offset
             res["type"] = "TestDataset"
             res["metadata"]["filename"] = info
+            res["type"] = "etrInfraDataset"
+        elif self.type == "KitechDataset":
+            pcd = o3d.io.read_point_cloud(str(res["metadata"]["data_root"] / res["metadata"]["pcd_prefix"] / info))
+            res["lidar"]["points"] = np.asarray(pcd.points, dtype=np.float32)
+            res["lidar"]["points"][:, 2] += self.offset
+            res["type"] = "KitechDataset"
+            res["metadata"]["filename"] = info
         else:
             raise NotImplementedError
 

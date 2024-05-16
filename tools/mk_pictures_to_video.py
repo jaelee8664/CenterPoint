@@ -5,11 +5,17 @@ import glob
 from pathlib import Path
 import os
 from tqdm import tqdm
-data_img = "data/test/camera/*.png"
-rst_img_dir = "work_dirs/test"
-video_name = "test_1.avi"
-H = 720
-W = 1280
+# H = 720
+# W = 1280
+# data_img = "data/kitech/camera/*.png"
+# rst_img_dir = "work_dirs/kitech_data"
+# video_name = "kitech_with_depth.avi"
+
+H = 2000
+W = 2000
+data_img = "final_visualize/*.png"
+video_name = "kitech_full.avi"
+rst_img_dir = "final_visualize"
 def image_load(data_img, rst_img_dir, H, W):
 
     img_array = []
@@ -30,10 +36,22 @@ def image_load(data_img, rst_img_dir, H, W):
 
     return size, img_array
 
+def image_load2(data_img):
 
-def video_generator(folder_path, file_name, size, fps, img_array):
+    img_array = []
+    idx = 0
+    for filename in tqdm(sorted(glob.glob(data_img))):
+        img = cv2.imread(filename)
+        img_array.append(img)
+        idx +=1
+        if idx > 9000:
+            break
+    return img_array
 
-    out = cv2.VideoWriter(filename=os.path.join(folder_path, file_name), fourcc=cv2.VideoWriter_fourcc(*'XVID'), fps=fps, frameSize= (W, 2*H))
+def video_generator(folder_path, file_name, fps, img_array):
+
+    # out = cv2.VideoWriter(filename=os.path.join(folder_path, file_name), fourcc=cv2.VideoWriter_fourcc(*'XVID'), fps=fps, frameSize= (W, 2*H))
+    out = cv2.VideoWriter(filename=os.path.join(folder_path, file_name), fourcc=cv2.VideoWriter_fourcc(*'XVID'), fps=fps, frameSize= (W, H))
 
     for img in img_array:
         out.write(img)
@@ -58,6 +76,7 @@ def video_play(file_name):
 
 
 if __name__ == "__main__":
-    img_size, img_array = image_load(data_img, rst_img_dir, H, W)
-    video_generator(folder_path= rst_img_dir, file_name=video_name, size=img_size, fps=15, img_array=img_array)
+    # img_size, img_array = image_load(data_img, rst_img_dir, H, W)
+    img_array = image_load2(data_img)
+    video_generator(folder_path = rst_img_dir, file_name=video_name, fps=20, img_array=img_array)
     video_play(file_name=video_name)

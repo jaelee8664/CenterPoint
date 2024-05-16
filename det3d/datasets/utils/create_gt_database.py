@@ -207,7 +207,7 @@ def create_etri_groundtruth_databse(
         
         # 인스턴스가 갖는 포인트 추출
         difficulty = np.zeros(gt_boxes.shape[0], dtype=np.int32)
-        point_indices = box_np_ops.points_in_rbbox(points, gt_boxes)
+        # point_indices = box_np_ops.points_in_rbbox(points, gt_boxes)
         for i in range(num_obj):
             filename = f"{index}_{names[i]}_{i}.bin"
             dirpath = os.path.join(str(db_path), names[i])

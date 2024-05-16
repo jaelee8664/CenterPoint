@@ -14,8 +14,13 @@ venv/
 *.zip
 *.bin
 *.png
+*.pcd
+*.jpg
 *.pickle
 .vscode/
 work_dirs/
 modelzoo/
 plot_results/
+final_visualize/
+final_visualize_partial/
+etri3Deval/

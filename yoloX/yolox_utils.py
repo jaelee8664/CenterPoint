@@ -30,7 +30,7 @@ def visual(output, img, test_size, cls_conf=0.5):
     bboxes /= scale
     cls = output[:, 6]
     scores = output[:, 4] * output[:, 5]
-    vis_res = vis(img, bboxes, scores, cls+3, cls_conf, COCO_CLASSES)
+    vis_res = vis(img, bboxes, scores, cls, cls_conf, COCO_CLASSES)
 
     return vis_res, bboxes, scores, cls, COCO_CLASSES
 
