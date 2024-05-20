@@ -128,6 +128,71 @@ def postprocess(prediction, num_classes, conf_thre=0.1, nms_thre=0.45):
 
     return output
 
+def postprocess2(prediction, num_classes, test_size, img_shape, conf_thre=0.1, nms_thre=0.45):
+    """
+    postprocess of yolox, including box scaling
+    Args:
+        prediction (array): predcied bbox coordinates
+        num_classes (_type_): number of classes
+        conf_thre (float, optional): confidence thres. Defaults to 0.1.
+        nms_thre (float, optional): nms thres. Defaults to 0.45.
+
+    Returns:
+        _type_: corrected bboxes
+    """
+    box_corner = prediction.new(prediction.shape)
+    box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
+    box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
+    box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
+    box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2
+    prediction[:, :, :4] = box_corner[:, :, :4]
+    scale = min(
+                test_size[0] / float(img_shape[0]), test_size[1] / float(img_shape[1])
+            )
+    output = [None for _ in range(len(prediction))]
+    for i, image_pred in enumerate(prediction):
+
+        # If none are remaining => process next image
+        if not image_pred.size(0):
+            continue
+        # Get score and class with highest confidence
+        class_conf, class_pred = torch.max(
+            image_pred[:, 5: 5 + num_classes], 1, keepdim=True
+        )
+
+        conf_mask = (image_pred[:, 4] *
+                     class_conf.squeeze() >= conf_thre).squeeze()
+        detections = torch.cat(
+            (image_pred[:, :5], class_conf, class_pred.float()), 1)
+        detections = detections[conf_mask]
+        if not detections.size(0):
+            continue
+        if detections.shape[1] == 1:
+            detections = detections.squeeze(0)
+        try:
+            nms_out_index = torchvision.ops.batched_nms(
+                detections[:, :4],
+                detections[:, 4] * detections[:, 5],
+                detections[:, 6],
+                nms_thre
+            )
+        except ValueError:
+            pdb.set_trace()
+        detections = detections[nms_out_index]
+        if output[i] is None:
+            res = torch.zeros((detections.shape[0], 6))
+            detections[:, :4] /= scale
+            res[:, 0:4] = detections[:, :4] 
+            res[:, 4] = detections[:, 4] * detections[:, 5]
+            res[:, 5] = detections[:, 6]
+            output[i] = res
+            
+        else:
+            output[i] = torch.cat((output[i], detections))
+
+    return output
+
+
 
 def fuse_conv_and_bn(conv, bn):
     """
@@ -185,7 +250,7 @@ def fuse_model(model):
     return model
 
 
-def get_model(depth=0.33, width=0.375):
+def get_model(depth=0.33, width=0.375, num_classes = 1):
     """
     initialize yolox model
     """
@@ -197,7 +262,7 @@ def get_model(depth=0.33, width=0.375):
 
     in_channels = [256, 512, 1024]
     backbone = YOLOPAFPN(depth=depth, width=width, in_channels=in_channels) # s: 0.33 0.50
-    head = YOLOXHead(num_classes=1, width=width, in_channels=in_channels)
+    head = YOLOXHead(num_classes=num_classes, width=width, in_channels=in_channels)
     model = YOLOX(backbone, head)
 
     model.apply(init_yolo)

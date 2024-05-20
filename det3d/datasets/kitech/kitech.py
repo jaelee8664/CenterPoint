@@ -44,7 +44,7 @@ class KitechDataset(PointCloudDataset):
         
         
     def __len__(self):
-        if not hasattr(self, "file_dirs"):
+        if not (hasattr(self, "file_dirs") or hasattr(self, "pcd_file_name")):
             
             self.pcd_file_name = []
             for (root, dirs, file) in os.walk(str(self._root_path)):

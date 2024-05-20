@@ -5,7 +5,7 @@ from .formating import Reformat
 from .loading import *
 from .test_aug import DoubleFlip
 from .preprocess import Preprocess, Voxelization
-
+from .realtime_pipeline import PreprocessRealtime
 __all__ = [
     "Compose",
     "to_tensor",
@@ -19,6 +19,7 @@ __all__ = [
     "LoadProposals",
     "PhotoMetricDistortion",
     "Preprocess",
+    "PreprocessRealtime",
     "Voxelization",
     "AssignTarget",
     "AssignLabel"

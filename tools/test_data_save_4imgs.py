@@ -330,7 +330,7 @@ for i in tqdm(range(len(input_output["points"]))):
 	depth_raw = np.array(PIL.Image.open(depth_file), dtype=np.uint16)
 	depth = depth_raw / 200
 	img3d = np.array(PIL.Image.open(img3d_file), dtype=np.uint8).reshape((720, 1280, 3))
- 
+
 	# # 3d 박스 이미지 좌표계에 투영
 	# img2 = box3d_projection(copy.deepcopy(img))
 	# # 3d 박스안에 있는 포인트만 이미지 좌표계에 투영

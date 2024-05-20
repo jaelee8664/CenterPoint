@@ -129,7 +129,7 @@ def parse_args():
         default="pytorch",
         help="job launcher",
     )
-    parser.add_argument("--checkpoint",default="modelzoo/etri3D_latest.pth", type=str, help="pretrained model path")
+    parser.add_argument("--checkpoint",default="modelzoo/etri3D_pointpillar/etri3D_latest.pth", type=str, help="pretrained model path")
     parser.add_argument("--local_rank", type=int, default=0)
     args = parser.parse_args()
     if "LOCAL_RANK" not in os.environ:
@@ -140,93 +140,93 @@ args = parse_args()
 cfg = Config.fromfile(args.config)
 os.makedirs(args.work_dir, exist_ok=True)
 
-if os.path.exists(args.load_from):
-    with open(args.load_from, "rb") as f:
-        input_output = pickle.load(f)
-else:
-    raise NotImplementedError
-    # cfg = Config.fromfile(args.config)
-    # # distribution 설정 안함
-    # cfg.local_rank = args.local_rank 
+# if os.path.exists(args.load_from):
+#     with open(args.load_from, "rb") as f:
+#         input_output = pickle.load(f)
+# else:
+#     raise NotImplementedError
 
-    # # init logger before other steps
-    # distributed = False
-    # cfg.gpus = args.gpus
-    # logger = get_root_logger(cfg.log_level)
-    # logger.info("Distributed training: {}".format(distributed))
-    # logger.info(f"torch.backends.cudnn.benchmark: {torch.backends.cudnn.benchmark}")
+cfg = Config.fromfile(args.config)
+# distribution 설정 안함
+cfg.local_rank = args.local_rank 
 
-    # model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
+# init logger before other steps
+distributed = False
+cfg.gpus = args.gpus
+logger = get_root_logger(cfg.log_level)
+logger.info("Distributed training: {}".format(distributed))
+logger.info(f"torch.backends.cudnn.benchmark: {torch.backends.cudnn.benchmark}")
 
-    # args.testset = False
-    # dataset = build_dataset(cfg.data.test)
+model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
 
-    # args.speed_test = True
-    # data_loader = build_dataloader(
-    #         dataset,
-    #         batch_size=cfg.data.samples_per_gpu if not args.speed_test else 1,
-    #         workers_per_gpu=cfg.data.workers_per_gpu,
-    #         dist=distributed,
-    #         shuffle=False,
-    #     )
+args.testset = False
+dataset = build_dataset(cfg.data.test)
 
-    # checkpoint = load_checkpoint(model, args.checkpoint, map_location="cpu")
+args.speed_test = True
+data_loader = build_dataloader(
+        dataset,
+        batch_size=cfg.data.samples_per_gpu if not args.speed_test else 1,
+        workers_per_gpu=cfg.data.workers_per_gpu,
+        dist=distributed,
+        shuffle=False,
+    )
 
-    # model = model.cuda()
-    # model.eval()
-    # mode = "test"
+checkpoint = load_checkpoint(model, args.checkpoint, map_location="cpu")
 
-    # detections = {}
-    # cpu_device = torch.device("cpu")
+model = model.cuda()
+model.eval()
+mode = "test"
 
-    # start = time.time()
+detections = {}
+cpu_device = torch.device("cpu")
 
-    # start = int(len(dataset) / 3)
-    # end = int(len(dataset) * 2 /3)
+start = time.time()
 
-    # time_start = 0 
-    # time_end = 0 
+start = int(len(dataset) / 3)
+end = int(len(dataset) * 2 /3)
 
-    # input_output = {"file_name": [], "points": [], "gt_boxes": [], "gt_classes": [], "output_boxes": [], "output_classes": [], "output_scores": []}
-    # for i, data_batch in tqdm(enumerate(data_loader)):
-    #     if args.z_offset != 0:
-    #         z_offset(data_batch, args.z_offset)
-    #     if i == start:
-    #         torch.cuda.synchronize()
-    #         time_start = time.time()
+time_start = 0 
+time_end = 0 
 
-    #     if i == end:
-    #         torch.cuda.synchronize()
-    #         time_end = time.time()
+input_output = {"file_name": [], "points": [], "gt_boxes": [], "gt_classes": [], "output_boxes": [], "output_classes": [], "output_scores": []}
+for i, data_batch in tqdm(enumerate(data_loader)):
+    if args.z_offset != 0:
+        z_offset(data_batch, args.z_offset)
+    if i == start:
+        torch.cuda.synchronize()
+        time_start = time.time()
 
-    #     with torch.no_grad():
-    #         outputs = batch_processor(
-    #             model, data_batch, train_mode=False, local_rank=args.local_rank,
-    #         )
-    #     for j, output in enumerate(outputs):
-    #         input_output["points"].append(data_batch['points'][j].cpu().numpy())
-    #         input_output["file_name"].append(data_batch['metadata'][j]['filename'])
-    #         # gt_boxes = []
-    #         # for ts in data_batch['anno_box']:
-    #         #     ts2 = ts[j]
-    #         #     gt_boxes.extend(ts2.cpu().numpy())
-    #         # input_output["gt_boxes"].append(np.array(gt_boxes))
-    #         # gt_classes = []
-    #         # idx = 0
-    #         # for k in range(data_batch["anno_cls"][j].shape[0]):
-    #         #     head_classes = cfg.tasks[k]
-    #         #     class_names = head_classes['class_names']
-    #         #     head_class_ids = data_batch['anno_cls'][j][k]
-    #         #     for l in range(len(head_class_ids)):
-    #         #         _id = head_class_ids[l] - 1
-    #         #         gt_classes.append(idx+_id)
-    #         #     idx += len(class_names)
-    #         input_output["output_classes"].append(output['label_preds'].cpu().numpy())
-    #         # input_output["gt_classes"].append(np.array(gt_classes))
-    #         input_output["output_boxes"].append(output["box3d_lidar"].cpu().numpy())
-    #         input_output["output_scores"].append(output['scores'].cpu().numpy())
-    # with open(args.load_from, "wb") as f:
-    #     pickle.dump(input_output, f)
+    if i == end:
+        torch.cuda.synchronize()
+        time_end = time.time()
+
+    with torch.no_grad():
+        outputs = batch_processor(
+            model, data_batch, train_mode=False, local_rank=args.local_rank,
+        )
+    for j, output in enumerate(outputs):
+        input_output["points"].append(data_batch['points'][j].cpu().numpy())
+        input_output["file_name"].append(data_batch['metadata'][j]['filename'])
+        # gt_boxes = []
+        # for ts in data_batch['anno_box']:
+        #     ts2 = ts[j]
+        #     gt_boxes.extend(ts2.cpu().numpy())
+        # input_output["gt_boxes"].append(np.array(gt_boxes))
+        # gt_classes = []
+        # idx = 0
+        # for k in range(data_batch["anno_cls"][j].shape[0]):
+        #     head_classes = cfg.tasks[k]
+        #     class_names = head_classes['class_names']
+        #     head_class_ids = data_batch['anno_cls'][j][k]
+        #     for l in range(len(head_class_ids)):
+        #         _id = head_class_ids[l] - 1
+        #         gt_classes.append(idx+_id)
+        #     idx += len(class_names)
+        input_output["output_classes"].append(output['label_preds'].cpu().numpy())
+        # input_output["gt_classes"].append(np.array(gt_classes))
+        input_output["output_boxes"].append(output["box3d_lidar"].cpu().numpy())
+        input_output["output_scores"].append(output['scores'].cpu().numpy())
+
 
 # visualizer
 mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=2, origin=[0,0,0])
