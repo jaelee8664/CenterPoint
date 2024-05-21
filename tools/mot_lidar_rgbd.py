@@ -16,7 +16,9 @@ from det3d.models import build_detector
 from det3d.torchie import Config
 from det3d.torchie.apis import batch_processor
 from det3d.torchie.trainer import load_checkpoint
-from det3d.utils.tracker_utils import iou_batch
+
+# MOT(Multi Object Tracking)
+from det3d.utils.tracker_utils import l2norm_batch, Track
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a detector")
@@ -162,30 +164,58 @@ class Detector():
 class Tracker():
     # Multi Object Tracking 모듈
     def __init__(self):
-        self.trackers = [] # 트랙 보관 리스트
+        self.tracks = [] # 트랙 보관 리스트
         self.min_hits = 3 # 트랙 초기화를 위한 최소 검출 횟수
         self.match3d_thres = 0.5 # 매칭을 위한 최대 매칭 기준 (m)
-        self.ret = [] # 결과
-
+        self.min_hits = 3 # 트랙 초기화시 매칭되어야하는 최소 횟수
+        self.t = 0.25 # 타임스텝
+        self.ret = [] # 현재 신뢰하는 트랙 상태
+        self.frame_count = 0 # 총 지난 횟수
+        self.max_age = 30 # 트랙이 제거되는 언매칭 횟수 기준. max_age동안 매칭이 되지 않으면 self.tracks에서 트랙 제거
+        
+        # 카메라 내부, 외부 파라미터
+        
     def matching(self, detections2d, detections3d, depth_image):
         """
         Args:
-            detections2d (torch.array): 2d 박스 x1y1x2y2 상태와 score, class 정보를 담은 N x 7 array
+            detections2d (torch.array): 2d 박스 x1y1x2y2 상태와 score, class 정보를 담은 N x 6 array
             detections3d (dict of torch.array): {'label_preds': torch.array, 'box3d_lidar': torch.array, 'scores' : torch.array}
                 'label_preds': 3d 박스 클래스, N array
                 'box3d_lidar': 3d 박스 형상 [x, y, z, w, l, h, rot] N x 6 array
                 'scores': 3d 박스 cofidence score, N array
             depth_image: (np.array) W x H 뎁스 이미지
+        Returns:
+            self.ret: 현재 신뢰하는 트랙정보
         """
-        if detections2d == None:
-            pass
+        self.ret.clear()
+        # 1. 2D measurement + 3D measurement 매칭
         
-        return
+        # 2. 3D measurement + track 매칭
+        # 3. 2D measurement + track 매칭
+        # 4. 남은 2D measurement 초기화
+        unmatched_dets = []
+        trk_idx = len(self.tracks)
+        for i in unmatched_dets:
+            trk = Track(detections2d[i, :], self.t)
+            self.tracks.append(trk)
+        for trk in reversed(self.tracks):
+            if trk.time_since_update < 1 and (trk.hit_streak >= self.min_hits or self.frame_count < self.min_hits):
+               self.ret.append(np.concatenate((np.array([[trk.id]]), trk.get_state()), axis=1))
+            trk_idx -= 1
+            if trk.time_since_update > self.max_age:
+                self.tracks.pop(trk_idx)
+        self.frame_count += 1
+        return self.ret
+    
+    def get_measurements_from2d():
+        
+        pass
     
     def get_tracks(self):
         """
-        현재 존재하는 track 검출
+        현재 존재하는 track 반환
         """
+        return self.ret
 
 def main():
     args = parse_args()
@@ -200,7 +230,7 @@ def main():
         # # 사람, 자전거만 detecting
         if output2d is not None:
             print("2D detected")
-        tracker.matching(output2d, output3d, depth_image)
+        cur_tracks = tracker.matching(output2d, output3d, depth_image)
         
         
 if __name__ == "__main__":
