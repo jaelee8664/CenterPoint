@@ -18,7 +18,10 @@ from det3d.torchie.apis import batch_processor
 from det3d.torchie.trainer import load_checkpoint
 
 # MOT(Multi Object Tracking)
-from det3d.utils.tracker_utils import l2norm_batch, Track
+from det3d.utils.tracker_utils import l2norm_batch, linear_assignment, Track
+
+# global variable
+MAXVAL = 1000000000
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a detector")
@@ -133,6 +136,7 @@ class Detector():
         self.model3d = self.model3d.to(self.device)
         # print(next(self.model3d.parameters()).device)
         load_checkpoint(self.model3d, self.pth_dir3d, map_location=self.device)
+
     def inference(self, image, points):
         """
         Args:
@@ -174,7 +178,43 @@ class Tracker():
         self.max_age = 30 # 트랙이 제거되는 언매칭 횟수 기준. max_age동안 매칭이 되지 않으면 self.tracks에서 트랙 제거
         
         # 카메라 내부, 외부 파라미터
+        self.intrinsic = np.array([[262.49102783203125, 0, 327.126708984375],
+                             [0, 262.49102783203125, 184.74203491210938],
+                             [0, 0, 1]])
+        self.intrinsic4 = np.concatenate((self.intrinsic, np.array([[0,0,0,1]])), axis=0)
+        self.extrinsic = np.array([[ 0, -1,  0,  0.02],
+                    [ 0,  0, -1, -0.17],
+                    [ 1,  0,  0, -0.06]])
+        self.inv_intrinsic = np.linalg.inv(self.intrinsic)
+        self.inv_intrinsic4 = np.linalg.inv(self.intrinsic4)
+        self.inv_extrinsic = np.linalg.inv(self.extrinsic)
         
+    def pnt2d_img_to_lidar(self, img_states, depth_img):
+        """
+        Args:
+            img_states (np.array): 2d 박스 x1y1x2y2 상태와 score, class 정보를 담은 N x 6 array
+        Returns:
+            2d box 가운데의 lidar 좌표계에서의 위치, 클래스 [x, y, z] N x 3 array
+        """
+        lidar_states = np.ones((4, img_states.shape[0]))
+        lidar_states[3, :] = img_states[:, 5].T
+        img_states = img_states.cpu().numpy()
+        # bboxes = img_states[:, 0:4]
+
+        x_states = (img_states[:, 0] + img_states[:, 2]) // 2
+        y_states = (img_states[:, 1] + img_states[:, 3]) // 2
+        lidar_states[0, :] = x_states.T
+        lidar_states[1, :] = y_states.T
+        for i in range(img_states.shape[0]):
+            if 0 <= x_states[i] < depth_img.shape[1] and 0 <= y_states[i] < depth_img.shape[0]:
+                z = depth_img[int(y_states[i]), int(x_states[i])]
+                lidar_states[:3, i] *= z
+            else:
+                lidar_states[:, i] = MAXVAL # depth를 뽑지 못하는 위치는 MAXVAL로 기록
+        lidar_states = np.matmul(self.inv_intrinsic4, lidar_states)
+        
+        return lidar_states.T[:, :3]
+
     def matching(self, detections2d, detections3d, depth_image):
         """
         Args:
@@ -188,15 +228,119 @@ class Tracker():
             self.ret: 현재 신뢰하는 트랙정보
         """
         self.ret.clear()
-        # 1. 2D measurement + 3D measurement 매칭
+        
+        # torch to numpy
+        bbox3d = detections3d['box3d_lidar'].cpu().numpy()
+        score3d = detections3d['scores'].cpu().numpy()
+        class3d = detections3d['label_preds'].cpu().numpy()
+        combined_detections = None # 2D + 3D 합쳐진 measurement
+        if detections2d is not None: 
+            detections2d = detections2d.cpu().numpy()
+            bbox2d = detections2d[:, :4]
+            # 1. 2D measurement + 3D measurement 매칭
+            bbox2d_glob = self.pnt2d_img_to_lidar(bbox2d, depth_image) # 2D 위치 => 3D 위치
+            measure_matrix = l2norm_batch(bbox2d_glob, bbox3d)
+            matched_idx = linear_assignment(measure_matrix)
+            
+            
+            to_remove_detections2d = []
+            to_remove_detections3d = []
+            for m in matched_idx:
+                idx2d, idx3d = m[0], m[1]
+                if measure_matrix[m[0], m[1]] >= self.match3d_thres:
+                    continue
+                to_remove_detections2d.append(idx2d)
+                to_remove_detections3d.append(idx3d)
+            combined_detections = detections3d[np.array(to_remove_detections3d)] # 3D 위치정보가 더 정확하다 가정
+            remained_idx_2d = np.setdiff1d(np.arange(bbox2d_glob.shape[0]), np.array(to_remove_detections2d))
+            remained_idx_3d = np.setdiff1d(np.arange(bbox3d.shape[0]), np.array(to_remove_detections2d))
+            bbox2d_glob = bbox2d_glob[remained_idx_2d]
+            bbox3d = bbox3d[remained_idx_3d]
+            score3d = score3d[remained_idx_3d]
+            class3d = class3d[remained_idx_3d]
+        
+        # prediction step
+        trks = np.zeros((len(self.tracks), 3))
+        to_del = []
+        for t, trk in enumerate(trks):
+            pos = self.tracks[t].predict(self.t)[0]
+            trk[:] = [pos[0], pos[1], pos[2]]
+            if np.any(np.isnan(pos)):
+                to_del.append(t)
+        trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
+        for t in reversed(to_del):
+            self.tracks.pop(t)
         
         # 2. 3D measurement + track 매칭
+        unmatched_tracks = []
+        unmatched_combined_detections = []
+        matched_tracks = []
+        # 2-1. combined measurement 매칭
+        if combined_detections is not None:
+            measure_matrix = l2norm_batch(combined_detections, trks)
+            matched_idx = linear_assignment(measure_matrix)
+            for d, _ in enumerate(combined_detections):
+                if (d not in matched_idx[:, 0]):
+                    unmatched_combined_detections.append(d)
+            for t, _ in enumerate(trks):
+                if (t not in matched_idx[:, 1]):
+                    unmatched_tracks.append(t)
+            for m in matched_idx:
+                if matched_idx[m[0], m[1]] >= self.match3d_thres:
+                    unmatched_combined_detections.append(m[0])
+                    unmatched_tracks.append(m[1])
+                else:
+                    matched_tracks.append(m.reshape(1,2))
+            for m in matched_tracks:
+                self.tracks[m[1]].update(combined_detections[m[0], :])
+        else:
+            for t, _ in enumerate(trks):
+                unmatched_tracks.append(t)
+                matched_tracks = np.empty((0, 2), dtype=int)
+
+        unmatched_tracks = np.array(unmatched_tracks)
+        unmatched_combined_detections = np.array(unmatched_combined_detections)
+        # 2-2. 3D measurement 매칭
+        if bbox3d.shape[0] > 0 and unmatched_tracks.shape[0] > 0:
+            left_tracks = trks[unmatched_tracks]
+            measure_matrix = l2norm_batch(bbox3d, left_tracks)
+            matched_idx = linear_assignment(measure_matrix)
+            to_remove_tracks = []
+            for m in matched_idx:
+                det_idx, trk_idx = m[0], unmatched_tracks[m[1]]
+                if matched_idx[m[0], m[1]] >= self.match3d_thres:
+                    continue
+                self.tracks[m[1]].update(bbox3d[m[0], :])
+                to_remove_tracks.append(trk_idx)
+            unmatched_tracks = np.setdiff1d(unmatched_tracks, np.array(to_remove_tracks))
+        
         # 3. 2D measurement + track 매칭
+        if bbox2d_glob.shape[0] > 0 and unmatched_tracks.shape[0] > 0:
+            left_tracks = trks[unmatched_tracks]
+            measure_matrix = l2norm_batch(bbox2d_glob, left_tracks)
+            matched_idx = linear_assignment(measure_matrix)
+            to_remove_tracks = []
+            to_remove_detections2d = []
+            for m in matched_idx:
+                det_idx, trk_idx = m[0], unmatched_tracks[m[1]]
+                if matched_idx[m[0], m[1]] >= self.match3d_thres:
+                    continue
+                self.tracks[m[1]].update(bbox2d_glob[m[0], :])
+                to_remove_tracks.append(trk_idx)
+                to_remove_detections2d.append(det_idx)
+            unmatched_tracks = np.setdiff1d(unmatched_tracks, np.array(to_remove_tracks))
+            unmatched_detection2d = []
+            for d, _ in enumerate(bbox2d_glob):
+                if (d not in matched_idx[:, 0]):
+                    unmatched_detection2d.append(d)
+            
         # 4. 남은 2D measurement 초기화
-        unmatched_dets = []
         trk_idx = len(self.tracks)
-        for i in unmatched_dets:
-            trk = Track(detections2d[i, :], self.t)
+        for i in unmatched_detection2d:
+            trk = Track(bbox2d_glob[i, :], self.t)
+            self.tracks.append(trk)
+        for i in unmatched_combined_detections:
+            trk = Track(combined_detections[i, :], self.t)
             self.tracks.append(trk)
         for trk in reversed(self.tracks):
             if trk.time_since_update < 1 and (trk.hit_streak >= self.min_hits or self.frame_count < self.min_hits):
@@ -207,13 +351,20 @@ class Tracker():
         self.frame_count += 1
         return self.ret
     
-    def get_measurements_from2d():
-        
-        pass
-    
-    def get_tracks(self):
+    def get_his_tracks(self):
         """
-        현재 존재하는 track 반환
+        현재 신뢰하는 track의 과거경로 반환
+        """
+        cur_id_list = list(self.ret[0, :])
+        his = []
+        for trk in self.tracks:
+            if trk.id in cur_id_list:
+                his.append([trk.id, trk.get_history()])
+        return his
+    
+    def get_cur_tracks(self):
+        """
+        현재 신뢰하는 track 반환
         """
         return self.ret
 

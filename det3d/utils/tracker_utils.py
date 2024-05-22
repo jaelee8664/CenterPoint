@@ -217,7 +217,7 @@ class IMM_Combiner():
         """
         return immstate
         """
-        return self.immest.x.reshape((1, 10))
+        return self.immest.x
 
 
 class Track():
@@ -247,17 +247,17 @@ class Track():
                             self.pos_filter2, self.pos_filter3]
         self.pos_imm = IMM_Combiner(self.pos_filters, self.id) # IMM 관리 Class
 
-    def update(self, pos, t):
+    def update(self, pos):
         self.pos = pos
         if pos is not None:
             self.last_observation = pos
             self.time_since_update = 0
             self.hits += 1
             self.hit_streak += 1
-            self.pos_imm.update(pos, t)
+            self.pos_imm.update(pos)
         else:
             self.last_observation = None
-            self.pos_imm.update(None, t)
+            self.pos_imm.update(None)
 
         # history 관리
         self.history.append(self.get_state())
@@ -277,3 +277,6 @@ class Track():
 
     def get_state(self):
         return self.pos_imm.get_state()
+    
+    def get_history(self):
+        return self.history
