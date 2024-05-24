@@ -1,8 +1,8 @@
 import numpy as np
 from collections import deque
 from filterpy.kalman import KalmanFilter
-from IMM import IMMEstimator
-from EKF_CV import ExtendedKalmanFilter
+from .EKF_CV import ExtendedKalmanFilter
+from .IMM import IMMEstimator
 import lap
 from scipy.optimize import linear_sum_assignment
 
@@ -217,7 +217,7 @@ class IMM_Combiner():
         """
         return immstate
         """
-        return self.immest.x
+        return self.immest.x.flatten()
 
 
 class Track():
@@ -240,9 +240,9 @@ class Track():
         self.predicted_state = None # IMM의 prediction step에서 예측된 state
         self.last_observation = pos # 마지막으로 매칭된 measurement
 
-        self.pos_filter1 = Constvel(self.pos, t) # 등속도 모델
-        self.pos_filter2 = Constacc(self.pos, t) # 등가속도 모델
-        self.pos_filter3 = Constantturnrate(self.pos, t) # 등각속도 모델
+        self.pos_filter1 = Constvel(pos, t) # 등속도 모델
+        self.pos_filter2 = Constacc(pos, t) # 등가속도 모델
+        self.pos_filter3 = Constantturnrate(pos, t) # 등각속도 모델
         self.pos_filters = [self.pos_filter1,
                             self.pos_filter2, self.pos_filter3]
         self.pos_imm = IMM_Combiner(self.pos_filters, self.id) # IMM 관리 Class
