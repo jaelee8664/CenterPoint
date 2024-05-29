@@ -73,10 +73,10 @@ class Constvel():
                               [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                               [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]])
         self.kf.R *= 100.  # (uncertainty/noise of measurement)
-        self.kf.P[3:, 3:] *= 100.
+        self.kf.P[3:, 3:] *= 10.
         self.kf.P *= 10.
         # (uncertainty/noise of propagation)
-        self.kf.Q[3:6, 3:6] *= 40.*(60**3*t**3)
+        self.kf.Q[3:6, 3:6] *= 20.*(t)
         self.kf.Q[6:10, 6:10] *= 0.
         if pos is not None:
             self.kf.x = np.concatenate((pos.reshape((3, 1)),
@@ -121,11 +121,11 @@ class Constacc():
                               [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                               [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]])
         self.kf.R *= 100.  # (uncertainty/noise of measurement)
-        self.kf.P[3:, 3:] *= 100.
+        self.kf.P[3:, 3:] *= 10.
         self.kf.P *= 10.
         # (uncertainty/noise of propagation)
-        self.kf.Q[3:6, 3:6] *= 40.*(60**3*t**3)
-        self.kf.Q[6:9, 6:9] *= 40.*(60*t)
+        self.kf.Q[3:6, 3:6] *= 20.*(t)
+        self.kf.Q[6:9, 6:9] *= 20.*(t**2)
         self.kf.Q[9, 9] *= 0.
         if pos is not None:
             self.kf.x = np.concatenate((pos.reshape((3, 1)),
@@ -170,7 +170,7 @@ class Constantturnrate():
                               [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]])
         self.kf.P[3:, 3:] *= 100.
         self.kf.P *= 10.
-        self.kf.Q[3:6, 3:6] *= 40.*(60**3*t**3)
+        self.kf.Q[3:6, 3:6] *= 400.*(t**3)
         self.kf.Q[6:9, 6:9] *= 0.
         self.kf.Q[9, 9] *= 0.002
 
@@ -193,10 +193,13 @@ class IMM_Combiner():
     """
     def __init__(self, filters, id_):
         self.num_filts = len(filters)
-        self.mu = np.array([0.34, 0.33, 0.33])
-        self.trans = np.array([[0.9, 0.08, 0.05],
-                               [0.15, 0.7, 0.15],
-                               [0.04, 0.16, 0.8]])
+        # self.mu = np.array([0.34, 0.33, 0.33])
+        # self.trans = np.array([[0.9, 0.08, 0.05],
+        #                        [0.15, 0.7, 0.15],
+        #                        [0.04, 0.16, 0.8]])
+        self.mu = np.array([0.5, 0.5])
+        self.trans = np.array([[0.9, 0.1],
+                               [0.1, 0.9]])
         self.id = id_
         self.immest = IMMEstimator(filters, self.mu,
                                          self.trans)
@@ -243,8 +246,9 @@ class Track():
         self.pos_filter1 = Constvel(pos, t) # 등속도 모델
         self.pos_filter2 = Constacc(pos, t) # 등가속도 모델
         self.pos_filter3 = Constantturnrate(pos, t) # 등각속도 모델
-        self.pos_filters = [self.pos_filter1,
-                            self.pos_filter2, self.pos_filter3]
+        # self.pos_filters = [self.pos_filter1,
+        #                     self.pos_filter2, self.pos_filter3]
+        self.pos_filters = [self.pos_filter1, self.pos_filter3]
         self.pos_imm = IMM_Combiner(self.pos_filters, self.id) # IMM 관리 Class
 
     def update(self, pos):
